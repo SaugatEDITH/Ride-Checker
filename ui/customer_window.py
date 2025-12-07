@@ -1,5 +1,7 @@
 import os
+import re
 import folium
+import requests
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QDateTimeEdit, QSpinBox, QMessageBox, QTableWidget,
@@ -7,7 +9,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import Qt, QUrl, QDateTime
+from PyQt5.QtCore import Qt, QUrl, QDateTime, pyqtSlot, QTimer, QThread, pyqtSignal
+from PyQt5.QtWidgets import QDesktopWidget
 from models.ride import Ride
 
 
@@ -20,9 +23,22 @@ class CustomerWindow(QWidget):
         self.dest_coords = None
 
         self.setWindowTitle("Customer Dashboard")
-        self.setGeometry(150, 50, 1100, 700)
-
+        self.setMinimumSize(500, 700)
+        self.center_and_resize_window()
+        
         self.setup_ui()
+
+    # -------------------------------------------------------
+    # CENTER AND RESIZE WINDOW
+    # -------------------------------------------------------
+    def center_and_resize_window(self):
+        """Center window and set to half screen size"""
+        screen = QDesktopWidget().screenGeometry()
+        width = screen.width() // 2
+        height = screen.height() // 2
+        x = (screen.width() - width) // 2
+        y = (screen.height() - height) // 2
+        self.setGeometry(x, y, width, height)
 
     # -------------------------------------------------------
     # UI Setup
@@ -31,6 +47,18 @@ class CustomerWindow(QWidget):
         main_layout = QHBoxLayout()
         left_panel = QVBoxLayout()
         right_panel = QVBoxLayout()
+
+        # ---------------------------------------------------
+        # LOGOUT BUTTON (top right)
+        # ---------------------------------------------------
+        header_layout = QHBoxLayout()
+        header_layout.addStretch()
+        logout_btn = QPushButton("Logout")
+        logout_btn.setIcon(QIcon("assets/icons/back.svg"))
+        logout_btn.clicked.connect(self.logout)
+        logout_btn.setStyleSheet("background-color: #d32f2f; padding: 6px 12px;")
+        header_layout.addWidget(logout_btn)
+        right_panel.addLayout(header_layout)
 
         # ---------------------------------------------------
         # LEFT SIDE → MAP
@@ -58,6 +86,13 @@ class CustomerWindow(QWidget):
         self.dest_display = QLabel("Not selected")
         right_panel.addWidget(dest_label)
         right_panel.addWidget(self.dest_display)
+        
+        # ---------------- Reset Selection Button ----------------
+        reset_btn = QPushButton("Reset Selection")
+        reset_btn.setIcon(QIcon("assets/icons/clear.svg"))
+        reset_btn.clicked.connect(self.reset_selection)
+        reset_btn.setStyleSheet("background-color: #ff9800; padding: 6px 12px;")
+        right_panel.addWidget(reset_btn)
 
         # ---------------- Pickup Date & Time ----------------
         dt_label = QLabel("Pickup Date & Time:")
@@ -66,10 +101,12 @@ class CustomerWindow(QWidget):
         right_panel.addWidget(dt_label)
         right_panel.addWidget(self.datetime_input)
 
-        # ---------------- Duration (Hours) ----------------
-        duration_label = QLabel("Duration (hours):")
+        # ---------------- Waiting/Staying Time (Hours) ----------------
+        duration_label = QLabel("Waiting/Staying Time (hours):")
         self.duration_input = QSpinBox()
-        self.duration_input.setRange(1, 24)
+        self.duration_input.setRange(0, 24)
+        self.duration_input.setValue(0)
+        self.duration_input.setToolTip("Additional waiting or staying time at destination")
         right_panel.addWidget(duration_label)
         right_panel.addWidget(self.duration_input)
 
@@ -81,7 +118,7 @@ class CustomerWindow(QWidget):
         right_panel.addWidget(self.tip_input)
 
         # ---------------- Cost display ----------------
-        self.cost_label = QLabel("Total Cost: $0.00")
+        self.cost_label = QLabel("Total Cost: Rs 0.00")
         self.cost_label.setStyleSheet("font-size: 18px; font-weight: bold; margin-top: 20px;")
         right_panel.addWidget(self.cost_label)
 
@@ -117,38 +154,425 @@ class CustomerWindow(QWidget):
     # LOAD MAP
     # -------------------------------------------------------
     def load_map(self):
-        tile_center = (37.7749, -122.4194)  # Default: San Francisco
+        # Kathmandu, Nepal coordinates
+        tile_center = (27.7172, 85.3240)
 
-        m = folium.Map(location=tile_center, zoom_start=13)
+        m = folium.Map(location=tile_center, zoom_start=12)
 
-        # JavaScript click listener to send coords to Python
-        m.add_child(folium.LatLngPopup())
-
-        # Save map HTML
+        # Save map HTML first
         map_path = "maps/customer_map.html"
         m.save(map_path)
 
-        self.map_view.load(QUrl.fromLocalFile(os.path.abspath(map_path)))
-        self.map_view.page().javaScriptConsoleMessage = self.handle_js
+        # Read the HTML and inject custom JavaScript for click handling
+        with open(map_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
 
+        # Find the map variable name dynamically
+        map_var_match = re.search(r'var (map_\w+) = L\.map\(', html_content)
+        if map_var_match:
+            map_var = map_var_match.group(1)
+        else:
+            # Fallback to a common pattern
+            map_var = 'map_fb402da949a9550e8f7562d58eb2b24f'
+
+        # Create click handler JavaScript
+        click_js = f"""
+        // Custom click handler to send coordinates to console
+        {map_var}.on('click', function(e) {{
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            console.log('MAP_CLICK: Latitude: ' + lat + ', Longitude: ' + lng);
+            
+            // Show popup
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent("Latitude: " + lat.toFixed(5) + "<br>Longitude: " + lng.toFixed(5))
+                .openOn({map_var});
+        }});
+        """
+        
+        # Insert the JavaScript before the closing </script> tag
+        # Find the last occurrence of </script> before </html>
+        last_script_pos = html_content.rfind('</script>')
+        if last_script_pos != -1:
+            # Insert our JavaScript before the closing script tag
+            html_content = html_content[:last_script_pos] + click_js + '\n' + html_content[last_script_pos:]
+
+        # Write the modified HTML back
+        with open(map_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        # Load the map and set up JavaScript console message handler
+        self.map_view.load(QUrl.fromLocalFile(os.path.abspath(map_path)))
+        
+        # Connect to page load finished to inject JavaScript
+        self.map_view.page().loadFinished.connect(self.on_map_loaded)
+        
+        # Coordinates will be captured via JavaScript injection in on_map_loaded
+        # We'll use a polling approach with runJavaScript to get coordinates
+
+    # -------------------------------------------------------
+    # ON MAP LOADED - Inject JavaScript after page loads
+    # -------------------------------------------------------
+    def on_map_loaded(self, success):
+        """Inject JavaScript click handler after map loads"""
+        if not success:
+            return
+            
+        # Find the map variable name from the HTML
+        map_path = "maps/customer_map.html"
+        with open(map_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        map_var_match = re.search(r'var (map_\w+) = L\.map\(', html_content)
+        if map_var_match:
+            map_var = map_var_match.group(1)
+        else:
+            # Try to find any map variable
+            map_var_match = re.search(r'(map_\w+)', html_content)
+            if map_var_match:
+                map_var = map_var_match.group(1)
+            else:
+                map_var = None
+        
+        if map_var:
+            # Inject click handler using runJavaScript - access map directly
+            click_js = f"""
+            (function() {{
+                try {{
+                    var map = {map_var};
+                    if (map && map instanceof L.Map) {{
+                        // Remove any existing click handlers
+                        map.off('click');
+                        // Add new click handler
+                        // Initialize window storage for coordinates and markers
+                        if (!window.lastMapClick) {{
+                            window.lastMapClick = null;
+                        }}
+                        window.pickupMarker = null;
+                        window.destMarker = null;
+                        window.routeLine = null;
+                        
+                        // Function to add/update pickup marker (green pin icon)
+                        window.addPickupMarker = function(lat, lng) {{
+                            if (window.pickupMarker) {{
+                                window.pickupMarker.remove();
+                            }}
+                            // Create green pin icon
+                            var greenIcon = L.icon({{
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            }});
+                            window.pickupMarker = L.marker([lat, lng], {{icon: greenIcon}}).addTo(map);
+                            window.pickupMarker.bindPopup('<b style="color: #4CAF50;">📍 Pickup Location</b><br>Lat: ' + lat.toFixed(5) + '<br>Lng: ' + lng.toFixed(5));
+                        }};
+                        
+                        // Function to add/update destination marker (red pin icon)
+                        window.addDestMarker = function(lat, lng) {{
+                            if (window.destMarker) {{
+                                window.destMarker.remove();
+                            }}
+                            // Create red pin icon
+                            var redIcon = L.icon({{
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            }});
+                            window.destMarker = L.marker([lat, lng], {{icon: redIcon}}).addTo(map);
+                            window.destMarker.bindPopup('<b style="color: #F44336;">🎯 Destination</b><br>Lat: ' + lat.toFixed(5) + '<br>Lng: ' + lng.toFixed(5));
+                            
+                            // Draw route line if pickup marker exists
+                            if (window.pickupMarker) {{
+                                if (window.routeLine) {{
+                                    window.routeLine.remove();
+                                }}
+                                var pickupLatLng = window.pickupMarker.getLatLng();
+                                // Draw straight line (will be updated with actual route if available)
+                                window.routeLine = L.polyline([
+                                    [pickupLatLng.lat, pickupLatLng.lng],
+                                    [lat, lng]
+                                ], {{
+                                    color: '#2196F3',
+                                    weight: 4,
+                                    opacity: 0.7,
+                                    dashArray: '10, 5'
+                                }}).addTo(map);
+                                // Fit map to show both markers
+                                var group = new L.featureGroup([window.pickupMarker, window.destMarker]);
+                                map.fitBounds(group.getBounds().pad(0.1));
+                            }}
+                        }};
+                        
+                        // Function to update route line when both markers exist
+                        window.updateRouteLine = function() {{
+                            if (window.pickupMarker && window.destMarker) {{
+                                if (window.routeLine) {{
+                                    window.routeLine.remove();
+                                }}
+                                var pickupLatLng = window.pickupMarker.getLatLng();
+                                var destLatLng = window.destMarker.getLatLng();
+                                window.routeLine = L.polyline([
+                                    [pickupLatLng.lat, pickupLatLng.lng],
+                                    [destLatLng.lat, destLatLng.lng]
+                                ], {{
+                                    color: '#2196F3',
+                                    weight: 4,
+                                    opacity: 0.7,
+                                    dashArray: '10, 5'
+                                }}).addTo(map);
+                                // Fit map to show both markers
+                                var group = new L.featureGroup([window.pickupMarker, window.destMarker]);
+                                map.fitBounds(group.getBounds().pad(0.1));
+                            }}
+                        }};
+                        
+                        map.on('click', function(e) {{
+                            var lat = e.latlng.lat;
+                            var lng = e.latlng.lng;
+                            // Store coordinates in window object for Python to retrieve
+                            window.lastMapClick = {{
+                                lat: lat,
+                                lng: lng,
+                                message: 'MAP_CLICK: Latitude: ' + lat + ', Longitude: ' + lng
+                            }};
+                            console.log(window.lastMapClick.message);
+                            
+                            // Show popup
+                            L.popup()
+                                .setLatLng(e.latlng)
+                                .setContent("Latitude: " + lat.toFixed(5) + "<br>Longitude: " + lng.toFixed(5))
+                                .openOn(map);
+                        }});
+                    }}
+                }} catch(e) {{
+                    console.error('Error setting up map click handler: ' + e);
+                }}
+            }})();
+            """
+            # Run after a short delay to ensure map is fully initialized
+            QTimer.singleShot(500, lambda: self.map_view.page().runJavaScript(click_js))
+            
+            # Set up polling to check for coordinates (less frequent to avoid hanging)
+            self.poll_timer = QTimer()
+            self.poll_timer.timeout.connect(self.poll_coordinates)
+            self.poll_timer.start(500)  # Check every 500ms (reduced frequency)
+
+    # -------------------------------------------------------
+    # POLL COORDINATES - Check for new coordinates from JavaScript
+    # -------------------------------------------------------
+    def poll_coordinates(self):
+        """Poll JavaScript for new coordinates"""
+        js_code = """
+        (function() {
+            if (window.lastMapClick) {
+                var coord = window.lastMapClick;
+                window.lastMapClick = null;  // Clear after reading
+                return coord.message;
+            }
+            return null;
+        })();
+        """
+        self.map_view.page().runJavaScript(js_code, self.handle_coord_result)
+    
+    # -------------------------------------------------------
+    # HANDLE COORDINATE RESULT
+    # -------------------------------------------------------
+    def handle_coord_result(self, result):
+        """Handle coordinate result from JavaScript"""
+        if result:
+            # Convert to string if needed
+            result_str = str(result) if result else ""
+            if result_str and "MAP_CLICK" in result_str:
+                self.handle_js(0, result_str, 0, "")
+    
     # -------------------------------------------------------
     # HANDLE MAP CLICK
     # -------------------------------------------------------
     def handle_js(self, level, message, line, sourceID):
         """
-        Captures text like: "Latitude: 37.77, Longitude: -122.41"
+        Captures text like: "MAP_CLICK: Latitude: 37.77, Longitude: -122.41"
         """
-        if "Latitude" in message:
-            parts = message.replace(",", "").split()
-            lat = float(parts[1])
-            lng = float(parts[3])
+        if "MAP_CLICK" in message:
+            try:
+                # Extract latitude and longitude from message
+                # Format: "MAP_CLICK: Latitude: 37.7749, Longitude: -122.4194"
+                # The message format has a comma between lat and lng
+                parts = message.split("Latitude:")[1].split("Longitude:")
+                lat_str = parts[0].strip()
+                lng_str = parts[1].strip()
+                
+                # Remove any trailing commas, spaces, or other non-numeric characters from lat_str
+                # lat_str might be like "37.7749, " so we need to remove the comma
+                lat_str = lat_str.rstrip(',').strip()
+                lng_str = lng_str.strip()
+                
+                # Extract just the numeric part (in case there are any other characters)
+                import re
+                lat_match = re.search(r'(-?\d+\.?\d*)', lat_str)
+                lng_match = re.search(r'(-?\d+\.?\d*)', lng_str)
+                
+                if lat_match and lng_match:
+                    lat = float(lat_match.group(1))
+                    lng = float(lng_match.group(1))
+                else:
+                    # Fallback to direct conversion if regex fails
+                    lat = float(lat_str)
+                    lng = float(lng_str)
 
-            if self.pickup_coords is None:
-                self.pickup_coords = (lat, lng)
-                self.pickup_display.setText(f"{lat:.5f}, {lng:.5f}")
-            else:
-                self.dest_coords = (lat, lng)
-                self.dest_display.setText(f"{lat:.5f}, {lng:.5f}")
+                if self.pickup_coords is None:
+                    self.pickup_coords = (lat, lng)
+                    self.pickup_display.setText(f"Pickup: {lat:.5f}, {lng:.5f}")
+                    # Add green marker for pickup
+                    self.add_pickup_marker(lat, lng)
+                else:
+                    self.dest_coords = (lat, lng)
+                    self.dest_display.setText(f"Destination: {lat:.5f}, {lng:.5f}")
+                    # Add red marker for destination
+                    self.add_dest_marker(lat, lng)
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing coordinates: {e}")
+                print(f"Message was: {message}")
+                print(f"Lat string: '{lat_str if 'lat_str' in locals() else 'N/A'}', Lng string: '{lng_str if 'lng_str' in locals() else 'N/A'}'")
+
+    # -------------------------------------------------------
+    # ADD MARKERS TO MAP
+    # -------------------------------------------------------
+    def add_pickup_marker(self, lat, lng):
+        """Add green marker for pickup location"""
+        js_code = f"if (window.addPickupMarker) {{ window.addPickupMarker({lat}, {lng}); if (window.destMarker) {{ window.updateRouteLine(); }} }}"
+        self.map_view.page().runJavaScript(js_code)
+    
+    def add_dest_marker(self, lat, lng):
+        """Add red marker for destination location"""
+        js_code = f"if (window.addDestMarker) {{ window.addDestMarker({lat}, {lng}); }}"
+        self.map_view.page().runJavaScript(js_code)
+    
+    def remove_markers(self):
+        """Remove all markers from map"""
+        js_code = """
+        if (window.pickupMarker) {
+            window.pickupMarker.remove();
+            window.pickupMarker = null;
+        }
+        if (window.destMarker) {
+            window.destMarker.remove();
+            window.destMarker = null;
+        }
+        if (window.routeLine) {
+            window.routeLine.remove();
+            window.routeLine = null;
+        }
+        """
+        self.map_view.page().runJavaScript(js_code)
+
+    # -------------------------------------------------------
+    # RESET SELECTION
+    # -------------------------------------------------------
+    def reset_selection(self):
+        """Reset pickup and destination coordinates"""
+        self.pickup_coords = None
+        self.dest_coords = None
+        self.pickup_display.setText("Not selected")
+        self.dest_display.setText("Not selected")
+        # Remove markers from map
+        self.remove_markers()
+        QMessageBox.information(self, "Reset", "Selection cleared. Click on the map to select new locations.")
+
+    # -------------------------------------------------------
+    # CALCULATE DRIVING DISTANCE (Non-blocking)
+    # -------------------------------------------------------
+    def calculate_driving_distance(self, pickup_coords, dest_coords, callback=None):
+        """
+        Calculate driving distance using OSRM routing service
+        Returns distance in kilometers (non-blocking)
+        """
+        # Use a thread to avoid blocking the UI
+        class DistanceCalculatorThread(QThread):
+            distance_calculated = pyqtSignal(float)
+            
+            def __init__(self, pickup_coords, dest_coords):
+                super().__init__()
+                self.pickup_coords = pickup_coords
+                self.dest_coords = dest_coords
+            
+            def run(self):
+                try:
+                    # OSRM routing service (free, no API key required)
+                    # Format: lng,lat (longitude first!)
+                    pickup_lng, pickup_lat = self.pickup_coords[1], self.pickup_coords[0]
+                    dest_lng, dest_lat = self.dest_coords[1], self.dest_coords[0]
+                    
+                    # Use OSRM routing API for actual road distance
+                    url = f"http://router.project-osrm.org/route/v1/driving/{pickup_lng},{pickup_lat};{dest_lng},{dest_lat}?overview=false&alternatives=false"
+                    
+                    response = requests.get(url, timeout=15)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('code') == 'Ok' and len(data.get('routes', [])) > 0:
+                            # Distance is in meters, convert to kilometers
+                            distance_meters = data['routes'][0]['distance']
+                            distance_km = distance_meters / 1000.0
+                            print(f"OSRM Road Distance: {distance_km:.2f} km")
+                            self.distance_calculated.emit(distance_km)
+                            return
+                        else:
+                            print(f"OSRM API returned code: {data.get('code')}, message: {data.get('message', 'Unknown error')}")
+                    else:
+                        print(f"OSRM API returned status code: {response.status_code}")
+                except requests.exceptions.Timeout:
+                    print("OSRM API request timed out")
+                except requests.exceptions.RequestException as e:
+                    print(f"OSRM API request error: {e}")
+                except Exception as e:
+                    print(f"Error calculating driving distance: {e}")
+                    import traceback
+                    traceback.print_exc()
+                
+                # Fallback to straight-line distance if routing fails
+                fallback_distance = Ride.calculate_distance(self.pickup_coords, self.dest_coords)
+                print(f"Using fallback straight-line distance: {fallback_distance:.2f} km")
+                self.distance_calculated.emit(fallback_distance)
+        
+        # If callback provided, use async approach
+        if callback:
+            # Stop any existing thread to avoid multiple calculations
+            try:
+                if hasattr(self, 'distance_thread'):
+                    thread = self.distance_thread
+                    if thread and thread.isRunning():
+                        thread.terminate()
+                        thread.wait(1000)  # Wait up to 1 second
+            except (RuntimeError, AttributeError):
+                # Thread object was deleted, ignore
+                pass
+            
+            self.distance_thread = DistanceCalculatorThread(pickup_coords, dest_coords)
+            self.distance_thread.distance_calculated.connect(callback)
+            self.distance_thread.finished.connect(lambda: setattr(self, 'distance_thread', None))
+            self.distance_thread.start()
+            return None
+        else:
+            # Synchronous fallback (with timeout) - not recommended, use callback instead
+            try:
+                pickup_lng, pickup_lat = pickup_coords[1], pickup_coords[0]
+                dest_lng, dest_lat = dest_coords[1], dest_coords[0]
+                url = f"http://router.project-osrm.org/route/v1/driving/{pickup_lng},{pickup_lat};{dest_lng},{dest_lat}?overview=false&alternatives=false"
+                response = requests.get(url, timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('code') == 'Ok' and len(data.get('routes', [])) > 0:
+                        distance_meters = data['routes'][0]['distance']
+                        return distance_meters / 1000.0
+            except:
+                pass
+            return Ride.calculate_distance(pickup_coords, dest_coords)
 
     # -------------------------------------------------------
     # COST CALCULATION
@@ -161,15 +585,32 @@ class CustomerWindow(QWidget):
         duration = self.duration_input.value()
         tip = float(self.tip_input.text() or 0)
 
-        distance = Ride.calculate_distance(self.pickup_coords, self.dest_coords)
-        base_cost, total_cost = Ride.calculate_cost(distance, duration, tip)
-
-        self.cost_label.setText(f"Total Cost: ${total_cost:.2f}")
-
-        self._distance = distance
-        self._base_cost = base_cost
-        self._total_cost = total_cost
-        self._tip = tip
+        # Show loading message
+        self.cost_label.setText("Calculating distance...")
+        
+        # Use non-blocking driving distance calculation
+        def on_distance_calculated(distance):
+            base_cost, total_cost = Ride.calculate_cost(distance, duration, tip)
+            # Show breakdown with road distance
+            # Calculate breakdown for display
+            distance_meters = distance * 1000
+            distance_cost = distance_meters * 0.05  # Rs 50 per meter
+            waiting_cost = duration * 200  # Rs 200 per hour
+            base_fare = 25  # Rs 25 base
+            
+            # Show detailed breakdown
+            self.cost_label.setText(
+                f"Total Cost: Rs {total_cost:.2f}\n"
+                f"Distance: {distance:.2f} km ({distance_meters:.0f} m)\n"
+                f"Base: Rs {base_fare:.2f} | Distance: Rs {distance_cost:.2f} | Waiting: Rs {waiting_cost:.2f}"
+            )
+            self._distance = distance
+            self._base_cost = base_cost
+            self._total_cost = total_cost
+            self._tip = tip
+        
+        # Calculate distance asynchronously
+        self.calculate_driving_distance(self.pickup_coords, self.dest_coords, on_distance_calculated)
 
     # -------------------------------------------------------
     # SUBMIT RIDE REQUEST
@@ -206,5 +647,19 @@ class CustomerWindow(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(ride["pickup_location"]))
             self.table.setItem(row, 2, QTableWidgetItem(ride["destination"]))
             self.table.setItem(row, 3, QTableWidgetItem(ride["pickup_datetime"]))
-            self.table.setItem(row, 4, QTableWidgetItem(f"${ride['total_cost']}"))
+            self.table.setItem(row, 4, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
             self.table.setItem(row, 5, QTableWidgetItem(ride["status"]))
+
+    # -------------------------------------------------------
+    # LOGOUT
+    # -------------------------------------------------------
+    def logout(self):
+        from ui.login_window import LoginWindow
+        reply = QMessageBox.question(
+            self, "Logout", "Are you sure you want to logout?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.login_window = LoginWindow()
+            self.login_window.show()
+            self.close()

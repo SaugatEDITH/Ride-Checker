@@ -1,7 +1,7 @@
 import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QMessageBox
+    QPushButton, QMessageBox, QDesktopWidget
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt
@@ -17,10 +17,22 @@ class LoginWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle("Ride Hailing App - Login")
-        self.setMinimumSize(500,700)
-        self.showMaximized()
+        self.setMinimumSize(500, 700)
+        self.center_and_resize_window()
 
         self.setup_ui()
+
+    # ---------------------------------------------------
+    # CENTER AND RESIZE WINDOW
+    # ---------------------------------------------------
+    def center_and_resize_window(self):
+        """Center window and set to half screen size"""
+        screen = QDesktopWidget().screenGeometry()
+        width = screen.width() // 2
+        height = screen.height() // 2
+        x = (screen.width() - width) // 2
+        y = (screen.height() - height) // 2
+        self.setGeometry(x, y, width, height)
 
     # ---------------------------------------------------
     # UI Layout

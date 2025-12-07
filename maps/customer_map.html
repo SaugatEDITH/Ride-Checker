@@ -1,82 +1,115 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <title>Customer Map</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
-    <!-- Leaflet Awesome Markers (optional) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_198764d7e7a3377a3c5750db0bc409c9 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
 
-    <style>
-        html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
-        #map { width: 100%; height: 100%; }
-    </style>
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
 </head>
 <body>
-<div id="map"></div>
-
-<script>
-    // Initialize the map
-    var map = L.map('map').setView([37.7749, -122.4194], 13);
-
-    // Add OpenStreetMap tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Markers for pickup and destination
-    var pickupMarker = null;
-    var destinationMarker = null;
-
-    // Function to place markers
-    function placeMarker(latlng, type) {
-        var icon = L.AwesomeMarkers.icon({
-            icon: type === 'pickup' ? 'play' : 'flag',
-            markerColor: type === 'pickup' ? 'green' : 'red',
-            prefix: 'fa'
-        });
-
-        if (type === 'pickup') {
-            if (pickupMarker) { map.removeLayer(pickupMarker); }
-            pickupMarker = L.marker(latlng, {draggable:true, icon: icon}).addTo(map)
-                              .bindPopup("Pickup").openPopup();
-        } else if (type === 'destination') {
-            if (destinationMarker) { map.removeLayer(destinationMarker); }
-            destinationMarker = L.marker(latlng, {draggable:true, icon: icon}).addTo(map)
-                                  .bindPopup("Destination").openPopup();
-        }
-    }
-
-    // On map click: first click sets pickup, second sets destination
-    map.on('click', function(e) {
-        if (!pickupMarker) {
-            placeMarker(e.latlng, 'pickup');
-        } else if (!destinationMarker) {
-            placeMarker(e.latlng, 'destination');
-        } else {
-            alert("Both pickup and destination are set. Drag markers to change them.");
-        }
-    });
-
-    // Function to return current coordinates
-    function getLocations() {
-        return {
-            pickup: pickupMarker ? pickupMarker.getLatLng() : null,
-            destination: destinationMarker ? destinationMarker.getLatLng() : null
-        };
-    }
-
-    // Debug: print coordinates every 2 seconds
-    setInterval(function() {
-        var locs = getLocations();
-        console.log("Pickup:", locs.pickup, "Destination:", locs.destination);
-    }, 2000);
-</script>
+    
+    
+            <div class="folium-map" id="map_198764d7e7a3377a3c5750db0bc409c9" ></div>
+        
 </body>
+<script>
+    
+    
+            var map_198764d7e7a3377a3c5750db0bc409c9 = L.map(
+                "map_198764d7e7a3377a3c5750db0bc409c9",
+                {
+                    center: [27.7172, 85.324],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 12,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_58d234960bd46df52f59145510a969c8 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_58d234960bd46df52f59145510a969c8.addTo(map_198764d7e7a3377a3c5750db0bc409c9);
+        
+
+        // Custom click handler to send coordinates to console
+        map_198764d7e7a3377a3c5750db0bc409c9.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            console.log('MAP_CLICK: Latitude: ' + lat + ', Longitude: ' + lng);
+            
+            // Show popup
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent("Latitude: " + lat.toFixed(5) + "<br>Longitude: " + lng.toFixed(5))
+                .openOn(map_198764d7e7a3377a3c5750db0bc409c9);
+        });
+        
+</script>
 </html>

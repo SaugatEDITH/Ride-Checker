@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
+    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDesktopWidget
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
@@ -13,7 +13,8 @@ class AdminWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle("Admin Dashboard")
-        self.setGeometry(100, 50, 1200, 700)
+        self.setMinimumSize(500, 700)
+        self.center_and_resize_window()
 
         self.setup_ui()
         self.load_users()
@@ -21,15 +22,35 @@ class AdminWindow(QWidget):
         self.load_analytics()
 
     # -------------------------------------------------------
+    # CENTER AND RESIZE WINDOW
+    # -------------------------------------------------------
+    def center_and_resize_window(self):
+        """Center window and set to half screen size"""
+        screen = QDesktopWidget().screenGeometry()
+        width = screen.width() // 2
+        height = screen.height() // 2
+        x = (screen.width() - width) // 2
+        y = (screen.height() - height) // 2
+        self.setGeometry(x, y, width, height)
+
+    # -------------------------------------------------------
     # UI SETUP
     # -------------------------------------------------------
     def setup_ui(self):
         main_layout = QVBoxLayout()
 
+        # Header with title and logout button
+        header_layout = QHBoxLayout()
         title = QLabel("Admin Dashboard")
-        title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 22px; font-weight: bold; margin-bottom: 10px;")
-        main_layout.addWidget(title)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        logout_btn = QPushButton("Logout")
+        logout_btn.setIcon(QIcon("assets/icons/back.svg"))
+        logout_btn.clicked.connect(self.logout)
+        logout_btn.setStyleSheet("background-color: #d32f2f; padding: 6px 12px;")
+        header_layout.addWidget(logout_btn)
+        main_layout.addLayout(header_layout)
 
         # ---------------- Analytics ----------------
         self.analytics_label = QLabel()
@@ -118,8 +139,22 @@ class AdminWindow(QWidget):
 
         analytics_text = f"""
         Total Rides: {total_rides}
-        Total Revenue: ${total_revenue:.2f}
+        Total Revenue: Rs {total_revenue:.2f}
         Average Ride Duration: {avg_duration:.2f} hours
         Busiest Pickup Hour: {busiest}
         """
         self.analytics_label.setText(analytics_text)
+
+    # -------------------------------------------------------
+    # LOGOUT
+    # -------------------------------------------------------
+    def logout(self):
+        from ui.login_window import LoginWindow
+        reply = QMessageBox.question(
+            self, "Logout", "Are you sure you want to logout?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.login_window = LoginWindow()
+            self.login_window.show()
+            self.close()

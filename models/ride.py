@@ -17,16 +17,23 @@ class Ride:
         return geodesic(pickup_coords, destination_coords).km
 
     # ---------------------------------------------------
-    # Helper: Cost Calculation
+    # Helper: Cost Calculation (Local Vehicle rates - Nepal)
     # ---------------------------------------------------
     @staticmethod
     def calculate_cost(distance_km, duration_hours, tip_amount):
-        rate_per_km = 2.0          # can be adjusted
-        rate_per_hour = 5.0        # can be adjusted
+        # Local vehicle rates (Tempo/Microbus style - Nepal)
+        base_fare = 25.0           # NPR 25 base fare
+        rate_per_meter = 0.05      # NPR 0.10 per meter (Rs 50 per km)
+        waiting_cost_per_hour = 200.0  # NPR 200 per hour for waiting/staying
 
-        base_cost = distance_km * rate_per_km
-        time_cost = duration_hours * rate_per_hour
-        total_cost = base_cost + time_cost + tip_amount
+        # Convert distance from km to meters
+        distance_meters = distance_km * 1000.0
+        
+        # Calculate costs
+        distance_cost = distance_meters * rate_per_meter
+        waiting_cost = duration_hours * waiting_cost_per_hour
+        base_cost = base_fare + distance_cost
+        total_cost = base_fare + distance_cost + waiting_cost + tip_amount
 
         return base_cost, total_cost
 
