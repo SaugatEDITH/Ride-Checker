@@ -159,9 +159,9 @@ class CustomerWindow(QWidget):
         # Add widgets to splitter
         splitter.addWidget(self.map_view)
         splitter.addWidget(right_widget)
-        splitter.setSizes([700, 500])  # initial proportions
-        splitter.setStretchFactor(0, 3)  # map
-        splitter.setStretchFactor(1, 2)  # controls
+        splitter.setSizes([1, 1])  # start at half/half
+        splitter.setStretchFactor(0, 1)  # map
+        splitter.setStretchFactor(1, 1)  # controls
 
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)

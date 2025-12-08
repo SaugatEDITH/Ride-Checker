@@ -69,7 +69,12 @@ class Ride:
     # ---------------------------------------------------
     @staticmethod
     def get_pending_rides():
-        rows = db.fetch("SELECT * FROM rides WHERE status = 'pending'")
+        rows = db.fetch("""
+            SELECT rides.*, users.phone_number AS customer_phone
+            FROM rides
+            LEFT JOIN users ON users.email = rides.customer_email
+            WHERE rides.status = 'pending'
+        """)
         return [dict(row) for row in rows]
 
     # ---------------------------------------------------
@@ -126,7 +131,12 @@ class Ride:
     # ---------------------------------------------------
     @staticmethod
     def get_driver_rides(driver_email):
-        rows = db.fetch("SELECT * FROM rides WHERE driver_email = ?", (driver_email,))
+        rows = db.fetch("""
+            SELECT rides.*, users.phone_number AS customer_phone
+            FROM rides
+            LEFT JOIN users ON users.email = rides.customer_email
+            WHERE rides.driver_email = ?
+        """, (driver_email,))
         return [dict(row) for row in rows]
 
     # ---------------------------------------------------

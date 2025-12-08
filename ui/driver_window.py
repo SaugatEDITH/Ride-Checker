@@ -60,9 +60,9 @@ class DriverWindow(QWidget):
         main_layout.addWidget(pending_title)
 
         self.pending_table = QTableWidget()
-        self.pending_table.setColumnCount(7)
+        self.pending_table.setColumnCount(8)
         self.pending_table.setHorizontalHeaderLabels(
-            ["ID", "Customer", "Pickup", "Destination", "Cost", "Accept", "Directions"]
+            ["ID", "Customer", "Customer Phone", "Pickup", "Destination", "Cost", "Accept", "Directions"]
         )
         self.pending_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         main_layout.addWidget(self.pending_table)
@@ -73,9 +73,9 @@ class DriverWindow(QWidget):
         main_layout.addWidget(history_title)
 
         self.history_table = QTableWidget()
-        self.history_table.setColumnCount(7)
+        self.history_table.setColumnCount(8)
         self.history_table.setHorizontalHeaderLabels(
-            ["ID", "Customer", "Pickup", "Destination", "Cost", "Status", "Directions"]
+            ["ID", "Customer", "Customer Phone", "Pickup", "Destination", "Cost", "Status", "Directions"]
         )
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         main_layout.addWidget(self.history_table)
@@ -92,15 +92,16 @@ class DriverWindow(QWidget):
         for row, ride in enumerate(rides):
             self.pending_table.setItem(row, 0, QTableWidgetItem(str(ride["id"])))
             self.pending_table.setItem(row, 1, QTableWidgetItem(ride["customer_email"]))
-            self.pending_table.setItem(row, 2, QTableWidgetItem(ride["pickup_location"]))
-            self.pending_table.setItem(row, 3, QTableWidgetItem(ride["destination"]))
-            self.pending_table.setItem(row, 4, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
+            self.pending_table.setItem(row, 2, QTableWidgetItem(str(ride.get("customer_phone") or "-")))
+            self.pending_table.setItem(row, 3, QTableWidgetItem(ride["pickup_location"]))
+            self.pending_table.setItem(row, 4, QTableWidgetItem(ride["destination"]))
+            self.pending_table.setItem(row, 5, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
 
             # Accept Button
             btn_accept = QPushButton("Accept")
             btn_accept.setIcon(QIcon("assets/icons/accept.svg"))
             btn_accept.clicked.connect(lambda _, ride_id=ride["id"]: self.accept_ride(ride_id))
-            self.pending_table.setCellWidget(row, 5, btn_accept)
+            self.pending_table.setCellWidget(row, 6, btn_accept)
 
             # Directions Button
             btn_dir = QPushButton("Directions")
@@ -108,7 +109,7 @@ class DriverWindow(QWidget):
             btn_dir.clicked.connect(
                 lambda _, pickup=ride["pickup_location"], dest=ride["destination"]: self.open_google_maps(pickup, dest)
             )
-            self.pending_table.setCellWidget(row, 6, btn_dir)
+            self.pending_table.setCellWidget(row, 7, btn_dir)
 
     # -------------------------------------------------------
     # ACCEPT RIDE
@@ -155,18 +156,19 @@ class DriverWindow(QWidget):
         for row, ride in enumerate(rides):
             self.history_table.setItem(row, 0, QTableWidgetItem(str(ride["id"])))
             self.history_table.setItem(row, 1, QTableWidgetItem(ride["customer_email"]))
-            self.history_table.setItem(row, 2, QTableWidgetItem(ride["pickup_location"]))
-            self.history_table.setItem(row, 3, QTableWidgetItem(ride["destination"]))
-            self.history_table.setItem(row, 4, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
+            self.history_table.setItem(row, 2, QTableWidgetItem(str(ride.get("customer_phone") or "-")))
+            self.history_table.setItem(row, 3, QTableWidgetItem(ride["pickup_location"]))
+            self.history_table.setItem(row, 4, QTableWidgetItem(ride["destination"]))
+            self.history_table.setItem(row, 5, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
             
             # Status or Complete Button
             if ride["status"] == "accepted":
                 btn = QPushButton("Complete")
                 btn.setIcon(QIcon("assets/icons/complete.svg"))
                 btn.clicked.connect(lambda _, ride_id=ride["id"]: self.complete_ride(ride_id))
-                self.history_table.setCellWidget(row, 5, btn)
+                self.history_table.setCellWidget(row, 6, btn)
             else:
-                self.history_table.setItem(row, 5, QTableWidgetItem(ride["status"]))
+                self.history_table.setItem(row, 6, QTableWidgetItem(ride["status"]))
 
             # Directions Button for all rides
             btn_dir = QPushButton("Directions")
@@ -174,7 +176,7 @@ class DriverWindow(QWidget):
             btn_dir.clicked.connect(
                 lambda _, pickup=ride["pickup_location"], dest=ride["destination"]: self.open_google_maps(pickup, dest)
             )
-            self.history_table.setCellWidget(row, 6, btn_dir)
+            self.history_table.setCellWidget(row, 7, btn_dir)
 
     # -------------------------------------------------------
     # COMPLETE RIDE

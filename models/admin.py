@@ -32,7 +32,7 @@ class Admin:
     # ---------------------------------------------------
     @staticmethod
     def total_revenue():
-        rows = db.fetch("SELECT SUM(total_cost) AS revenue FROM rides")
+        rows = db.fetch("SELECT SUM(total_cost) AS revenue FROM rides WHERE status != 'cancelled'")
         return rows[0]["revenue"] if rows[0]["revenue"] else 0
 
     # ---------------------------------------------------
