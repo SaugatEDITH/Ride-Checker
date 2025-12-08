@@ -12,6 +12,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import Qt, QUrl, QDateTime, pyqtSlot, QTimer, QThread, pyqtSignal
 from models.ride import Ride
+from PyQt5.QtWidgets import QSizePolicy
 
 
 class CustomerWindow(QWidget):
@@ -47,7 +48,9 @@ class CustomerWindow(QWidget):
         main_layout = QHBoxLayout()
         splitter = QSplitter(Qt.Horizontal)
 
-        left_panel = QVBoxLayout()
+        left_widget = QWidget()
+        left_panel = QVBoxLayout(left_widget)
+
         right_panel = QVBoxLayout()
 
         # ---------------------------------------------------
@@ -68,6 +71,8 @@ class CustomerWindow(QWidget):
         self.map_view = QWebEngineView()
         self.load_map()
         left_panel.addWidget(self.map_view)
+        self.map_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.map_view.setMinimumWidth(200)
 
         # ---------------------------------------------------
         # RIGHT SIDE → FORM PANEL
@@ -157,7 +162,7 @@ class CustomerWindow(QWidget):
         right_widget.setLayout(right_panel)
 
         # Add widgets to splitter
-        splitter.addWidget(self.map_view)
+        splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
         splitter.setSizes([1, 1])  # start at half/half
         splitter.setStretchFactor(0, 1)  # map
