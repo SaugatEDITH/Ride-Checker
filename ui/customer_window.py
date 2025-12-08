@@ -5,7 +5,8 @@ import requests
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QDateTimeEdit, QSpinBox, QMessageBox, QTableWidget,
-    QTableWidgetItem, QHeaderView, QDialog, QFormLayout, QDialogButtonBox, QDesktopWidget
+    QTableWidgetItem, QHeaderView, QDialog, QFormLayout, QDialogButtonBox,
+    QDesktopWidget, QSplitter
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -44,12 +45,10 @@ class CustomerWindow(QWidget):
     # -------------------------------------------------------
     def setup_ui(self):
         main_layout = QHBoxLayout()
+        splitter = QSplitter(Qt.Horizontal)
+
         left_panel = QVBoxLayout()
         right_panel = QVBoxLayout()
-
-        # Give more space to the right panel for edit controls
-        main_layout.setStretch(0, 3)  # map
-        main_layout.setStretch(1, 2)  # controls
 
         # ---------------------------------------------------
         # LOGOUT BUTTON (top right)
@@ -153,8 +152,18 @@ class CustomerWindow(QWidget):
 
         self.load_history()
 
-        main_layout.addLayout(left_panel, 2)
-        main_layout.addLayout(right_panel, 1)
+        # Wrap right panel in a widget to place inside splitter
+        right_widget = QWidget()
+        right_widget.setLayout(right_panel)
+
+        # Add widgets to splitter
+        splitter.addWidget(self.map_view)
+        splitter.addWidget(right_widget)
+        splitter.setSizes([700, 500])  # initial proportions
+        splitter.setStretchFactor(0, 3)  # map
+        splitter.setStretchFactor(1, 2)  # controls
+
+        main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
     # -------------------------------------------------------
