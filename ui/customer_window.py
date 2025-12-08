@@ -5,12 +5,11 @@ import requests
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QDateTimeEdit, QSpinBox, QMessageBox, QTableWidget,
-    QTableWidgetItem, QHeaderView
+    QTableWidgetItem, QHeaderView, QDialog, QFormLayout, QDialogButtonBox, QDesktopWidget
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import Qt, QUrl, QDateTime, pyqtSlot, QTimer, QThread, pyqtSignal
-from PyQt5.QtWidgets import QDesktopWidget
 from models.ride import Ride
 
 
@@ -47,6 +46,10 @@ class CustomerWindow(QWidget):
         main_layout = QHBoxLayout()
         left_panel = QVBoxLayout()
         right_panel = QVBoxLayout()
+
+        # Give more space to the right panel for edit controls
+        main_layout.setStretch(0, 3)  # map
+        main_layout.setStretch(1, 2)  # controls
 
         # ---------------------------------------------------
         # LOGOUT BUTTON (top right)
@@ -94,10 +97,13 @@ class CustomerWindow(QWidget):
         reset_btn.setStyleSheet("background-color: #ff9800; padding: 6px 12px;")
         right_panel.addWidget(reset_btn)
 
-        # ---------------- Pickup Date & Time ----------------
+        # ---------------- Pickup Date & Time ---------------- 
         dt_label = QLabel("Pickup Date & Time:")
         self.datetime_input = QDateTimeEdit(QDateTime.currentDateTime())
         self.datetime_input.setCalendarPopup(True)
+        # Prevent selecting past dates/times and clamp if user scrolls below now
+        self.datetime_input.setMinimumDateTime(QDateTime.currentDateTime())
+        self.datetime_input.dateTimeChanged.connect(self.enforce_min_datetime)
         right_panel.addWidget(dt_label)
         right_panel.addWidget(self.datetime_input)
 
@@ -119,7 +125,8 @@ class CustomerWindow(QWidget):
 
         # ---------------- Cost display ----------------
         self.cost_label = QLabel("Total Cost: Rs 0.00")
-        self.cost_label.setStyleSheet("font-size: 18px; font-weight: bold; margin-top: 20px;")
+        self.cost_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-top: 20px;")
+        self.cost_label.setWordWrap(True)  # Allow text wrapping
         right_panel.addWidget(self.cost_label)
 
         # ---------------- Calc + Request Buttons ----------------
@@ -128,10 +135,10 @@ class CustomerWindow(QWidget):
         calc_btn.clicked.connect(self.calculate_cost)
         right_panel.addWidget(calc_btn)
 
-        req_btn = QPushButton("Submit Ride Request")
-        req_btn.setIcon(QIcon("assets/icons/confirm.svg"))
-        req_btn.clicked.connect(self.submit_request)
-        right_panel.addWidget(req_btn)
+        self.req_btn = QPushButton("Submit Ride Request")
+        self.req_btn.setIcon(QIcon("assets/icons/confirm.svg"))
+        self.req_btn.clicked.connect(self.submit_request)
+        right_panel.addWidget(self.req_btn)
 
         # ---------------- Ride History Section ----------------
         hist_title = QLabel("Ride History")
@@ -139,8 +146,8 @@ class CustomerWindow(QWidget):
         right_panel.addWidget(hist_title)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Pickup", "Destination", "Date", "Cost", "Status"])
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(["ID", "Pickup", "Destination", "Date", "Cost", "Status", "Cancel", "Update"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         right_panel.addWidget(self.table)
 
@@ -437,9 +444,8 @@ class CustomerWindow(QWidget):
                     # Add red marker for destination
                     self.add_dest_marker(lat, lng)
             except (ValueError, IndexError) as e:
-                print(f"Error parsing coordinates: {e}")
-                print(f"Message was: {message}")
-                print(f"Lat string: '{lat_str if 'lat_str' in locals() else 'N/A'}', Lng string: '{lng_str if 'lng_str' in locals() else 'N/A'}'")
+                # Silently handle parsing errors
+                pass
 
     # -------------------------------------------------------
     # ADD MARKERS TO MAP
@@ -519,25 +525,14 @@ class CustomerWindow(QWidget):
                             # Distance is in meters, convert to kilometers
                             distance_meters = data['routes'][0]['distance']
                             distance_km = distance_meters / 1000.0
-                            print(f"OSRM Road Distance: {distance_km:.2f} km")
                             self.distance_calculated.emit(distance_km)
                             return
-                        else:
-                            print(f"OSRM API returned code: {data.get('code')}, message: {data.get('message', 'Unknown error')}")
-                    else:
-                        print(f"OSRM API returned status code: {response.status_code}")
-                except requests.exceptions.Timeout:
-                    print("OSRM API request timed out")
-                except requests.exceptions.RequestException as e:
-                    print(f"OSRM API request error: {e}")
-                except Exception as e:
-                    print(f"Error calculating driving distance: {e}")
-                    import traceback
-                    traceback.print_exc()
+                except Exception:
+                    # Silently fallback to straight-line distance if routing fails
+                    pass
                 
                 # Fallback to straight-line distance if routing fails
                 fallback_distance = Ride.calculate_distance(self.pickup_coords, self.dest_coords)
-                print(f"Using fallback straight-line distance: {fallback_distance:.2f} km")
                 self.distance_calculated.emit(fallback_distance)
         
         # If callback provided, use async approach
@@ -598,12 +593,15 @@ class CustomerWindow(QWidget):
             waiting_cost = duration * 200  # Rs 200 per hour
             base_fare = 25  # Rs 25 base
             
-            # Show detailed breakdown
-            self.cost_label.setText(
-                f"Total Cost: Rs {total_cost:.2f}\n"
-                f"Distance: {distance:.2f} km ({distance_meters:.0f} m)\n"
-                f"Base: Rs {base_fare:.2f} | Distance: Rs {distance_cost:.2f} | Waiting: Rs {waiting_cost:.2f}"
+            # Show detailed breakdown (formatted to fit screen)
+            cost_text = (
+                f"Total: Rs {total_cost:.2f}\n"
+                f"Distance: {distance:.2f} km\n"
+                f"Base: Rs {base_fare:.2f}\n"
+                f"Distance Cost: Rs {distance_cost:.2f}\n"
+                f"Waiting: Rs {waiting_cost:.2f}"
             )
+            self.cost_label.setText(cost_text)
             self._distance = distance
             self._base_cost = base_cost
             self._total_cost = total_cost
@@ -620,11 +618,38 @@ class CustomerWindow(QWidget):
             QMessageBox.warning(self, "Error", "Calculate cost before submitting.")
             return
 
+        # Validate date/time is not in the past
+        selected_datetime = self.datetime_input.dateTime()
+        if selected_datetime < QDateTime.currentDateTime():
+            QMessageBox.warning(self, "Error", "Cannot book rides in the past. Please select a future date and time.")
+            return
+
+        # If editing an existing pending ride, update instead of create
+        if getattr(self, "editing_ride_id", None):
+            ride_id = self.editing_ride_id
+            success, message = Ride.update_ride(
+                ride_id,
+                self.user.email,
+                pickup_location=str(self.pickup_coords),
+                destination=str(self.dest_coords),
+                pickup_datetime=selected_datetime.toString("yyyy-MM-dd HH:mm"),
+                duration_hours=self.duration_input.value(),
+            )
+            if success:
+                QMessageBox.information(self, "Success", "Ride updated successfully.")
+                self.editing_ride_id = None
+                self.req_btn.setText("Submit Ride Request")
+                self.load_history()
+            else:
+                QMessageBox.warning(self, "Error", message)
+            return
+
+        # Otherwise create a new ride
         Ride.create_ride(
             self.user.email,
             str(self.pickup_coords),
             str(self.dest_coords),
-            self.datetime_input.dateTime().toString("yyyy-MM-dd HH:mm"),
+            selected_datetime.toString("yyyy-MM-dd HH:mm"),
             self.duration_input.value(),
             self._distance,
             self._base_cost,
@@ -649,6 +674,136 @@ class CustomerWindow(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(ride["pickup_datetime"]))
             self.table.setItem(row, 4, QTableWidgetItem(f"Rs {ride['total_cost']:.2f}"))
             self.table.setItem(row, 5, QTableWidgetItem(ride["status"]))
+            
+            status_lower = (ride.get("status") or "").lower()
+
+            # Add Cancel button for pending/accepted rides
+            if status_lower in ["pending", "accepted"]:
+                cancel_btn = QPushButton("Cancel")
+                cancel_btn.setIcon(QIcon("assets/icons/delete.svg"))
+                cancel_btn.setStyleSheet("background-color: #d32f2f; padding: 4px 8px;")
+                cancel_btn.clicked.connect(lambda _, ride_id=ride["id"]: self.cancel_booking(ride_id))
+                self.table.setCellWidget(row, 6, cancel_btn)
+            else:
+                self.table.setItem(row, 6, QTableWidgetItem("-"))
+            
+            # Add Update button for pending rides only
+            if status_lower == "pending":
+                update_btn = QPushButton("Update")
+                update_btn.setIcon(QIcon("assets/icons/edit.svg"))
+                update_btn.setStyleSheet("background-color: #ff9800; padding: 4px 8px;")
+                update_btn.clicked.connect(lambda _, ride_id=ride["id"]: self.update_booking(ride_id))
+                self.table.setCellWidget(row, 7, update_btn)
+            else:
+                self.table.setItem(row, 7, QTableWidgetItem("-"))
+
+    # -------------------------------------------------------
+    # CANCEL BOOKING
+    # -------------------------------------------------------
+    def cancel_booking(self, ride_id):
+        """Cancel a customer booking"""
+        reply = QMessageBox.question(
+            self, "Cancel Booking", f"Are you sure you want to cancel booking #{ride_id}?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            success = Ride.cancel_ride(ride_id, self.user.email)
+            if success:
+                QMessageBox.information(self, "Success", f"Booking #{ride_id} cancelled.")
+                self.load_history()
+            else:
+                QMessageBox.warning(self, "Error", "Could not cancel booking. It may have already been completed.")
+
+    # -------------------------------------------------------
+    # UPDATE BOOKING
+    # -------------------------------------------------------
+    def update_booking(self, ride_id):
+        """Update a pending booking using the main form and map."""
+        import ast
+
+        # Get current ride details
+        rides = Ride.get_customer_rides(self.user.email)
+        ride = next((r for r in rides if r["id"] == ride_id), None)
+        if not ride or (ride.get("status") or "").lower() != "pending":
+            QMessageBox.warning(self, "Error", "Can only update pending bookings.")
+            return
+
+        # Parse stored coordinates (stringified tuples)
+        def parse_coords(value):
+            try:
+                coords = ast.literal_eval(value)
+                if isinstance(coords, (list, tuple)) and len(coords) == 2:
+                    return float(coords[0]), float(coords[1])
+            except Exception:
+                return None
+            return None
+
+        pickup = parse_coords(ride.get("pickup_location"))
+        dest = parse_coords(ride.get("destination"))
+
+        # Set editing mode
+        self.editing_ride_id = ride_id
+        self.req_btn.setText("Save Update")
+
+        # Reset markers then set new ones
+        self.remove_markers()
+        self.pickup_coords = pickup
+        self.dest_coords = dest
+
+        if pickup:
+            self.pickup_display.setText(f"Pickup: {pickup[0]:.5f}, {pickup[1]:.5f}")
+            self.add_pickup_marker(pickup[0], pickup[1])
+        else:
+            self.pickup_display.setText("Pickup: Not selected")
+
+        if dest:
+            self.dest_display.setText(f"Destination: {dest[0]:.5f}, {dest[1]:.5f}")
+            self.add_dest_marker(dest[0], dest[1])
+        else:
+            self.dest_display.setText("Destination: Not selected")
+
+        # Set date/time and duration
+        dt = QDateTime.fromString(ride.get("pickup_datetime", ""), "yyyy-MM-dd HH:mm")
+        if dt.isValid():
+            self.datetime_input.setDateTime(dt)
+        self.duration_input.setValue(int(ride.get("duration_hours", 0) or 0))
+
+        # Prefill tip and cost breakdown to allow immediate save if unchanged
+        self.tip_input.setText(str(ride.get("tip_amount") or 0))
+        self._distance = ride.get("distance_km") or 0
+        self._base_cost = ride.get("base_cost") or 0
+        self._total_cost = ride.get("total_cost") or 0
+        self._tip = ride.get("tip_amount") or 0
+
+        # Show existing cost info; user can recalc if they change coords/time
+        cost_text = (
+            f"Total Cost: Rs {self._total_cost:.2f}\n"
+            f"Distance: {self._distance:.2f} km ({self._distance*1000:.0f} m)\n"
+            f"Base: Rs {self._base_cost:.2f}"
+        )
+        self.cost_label.setText(cost_text)
+
+        QMessageBox.information(
+            self,
+            "Edit Mode",
+            "You are now editing this pending ride.\n"
+            "Use the map to re-select pickup/destination, adjust time/duration, then click 'Save Update'."
+        )
+
+    # -------------------------------------------------------
+    # ENFORCE MIN DATETIME
+    # -------------------------------------------------------
+    def enforce_min_datetime(self, dt):
+        """Clamp the main datetime input to now or later."""
+        now = QDateTime.currentDateTime()
+        if dt < now:
+            self.datetime_input.setDateTime(now)
+
+    def enforce_min_datetime_widget(self, widget, dt):
+        """Clamp any datetime widget to now or later."""
+        now = QDateTime.currentDateTime()
+        if dt < now:
+            widget.setDateTime(now)
 
     # -------------------------------------------------------
     # LOGOUT

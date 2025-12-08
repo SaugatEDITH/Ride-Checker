@@ -114,10 +114,13 @@ class DriverWindow(QWidget):
     # ACCEPT RIDE
     # -------------------------------------------------------
     def accept_ride(self, ride_id):
-        Ride.accept_ride(ride_id, self.user.email)
-        QMessageBox.information(self, "Success", f"Ride {ride_id} accepted!")
-        self.load_pending_rides()
-        self.load_history()
+        success, message = Ride.accept_ride(ride_id, self.user.email)
+        if success:
+            QMessageBox.information(self, "Success", message)
+            self.load_pending_rides()
+            self.load_history()
+        else:
+            QMessageBox.warning(self, "Error", message)
 
     # -------------------------------------------------------
     # OPEN GOOGLE MAPS

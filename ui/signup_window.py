@@ -72,6 +72,48 @@ class SignupWindow(QWidget):
         main_layout.addLayout(email_box)
 
         # ---------------------------------------------------
+        # Name Field (Required for customers)
+        # ---------------------------------------------------
+        name_box = QHBoxLayout()
+        name_icon = QLabel()
+        name_icon.setPixmap(QPixmap("assets/icons/user.svg").scaled(22, 22))
+
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Full Name")
+
+        name_box.addWidget(name_icon)
+        name_box.addWidget(self.name_input)
+        main_layout.addLayout(name_box)
+
+        # ---------------------------------------------------
+        # Address Field (Required for customers)
+        # ---------------------------------------------------
+        address_box = QHBoxLayout()
+        address_label = QLabel("📍")
+        address_label.setStyleSheet("font-size: 18px;")
+
+        self.address_input = QLineEdit()
+        self.address_input.setPlaceholderText("Address")
+
+        address_box.addWidget(address_label)
+        address_box.addWidget(self.address_input)
+        main_layout.addLayout(address_box)
+
+        # ---------------------------------------------------
+        # Phone Number Field (Required for customers)
+        # ---------------------------------------------------
+        phone_box = QHBoxLayout()
+        phone_label = QLabel("📞")
+        phone_label.setStyleSheet("font-size: 18px;")
+
+        self.phone_input = QLineEdit()
+        self.phone_input.setPlaceholderText("Phone Number")
+
+        phone_box.addWidget(phone_label)
+        phone_box.addWidget(self.phone_input)
+        main_layout.addLayout(phone_box)
+
+        # ---------------------------------------------------
         # Username Field
         # ---------------------------------------------------
         username_box = QHBoxLayout()
@@ -139,13 +181,23 @@ class SignupWindow(QWidget):
         email = self.email_input.text().strip()
         username = self.username_input.text().strip()
         password = self.password_input.text().strip()
-        role = self.role_dropdown.currentText()
+        role = self.role_dropdown.currentText().lower()
+        name = self.name_input.text().strip()
+        address = self.address_input.text().strip()
+        phone_number = self.phone_input.text().strip()
 
+        # Validate required fields
         if not email or not username or not password:
-            QMessageBox.warning(self, "Error", "All fields are required.")
+            QMessageBox.warning(self, "Error", "Email, Username, and Password are required.")
             return
 
-        ok, msg = User.signup(email, username, password, role)
+        # For customers, require name, address, and phone number
+        if role == "customer":
+            if not name or not address or not phone_number:
+                QMessageBox.warning(self, "Error", "For customers, Name, Address, and Phone Number are required.")
+                return
+
+        ok, msg = User.signup(email, username, password, role, name, address, phone_number)
 
         if not ok:
             QMessageBox.warning(self, "Error", msg)

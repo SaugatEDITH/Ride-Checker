@@ -73,3 +73,11 @@ class Admin:
     def delete_user(email):
         User.delete_user(email)
         return True
+
+    # ---------------------------------------------------
+    # Get all drivers (for assignment)
+    # ---------------------------------------------------
+    @staticmethod
+    def get_drivers():
+        rows = db.fetch("SELECT email, username, name FROM users WHERE role = 'driver'")
+        return [dict(row) for row in rows]

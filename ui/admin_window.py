@@ -64,8 +64,8 @@ class AdminWindow(QWidget):
         main_layout.addWidget(user_title)
 
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(4)
-        self.user_table.setHorizontalHeaderLabels(["Email", "Username", "Role", "Action"])
+        self.user_table.setColumnCount(7)
+        self.user_table.setHorizontalHeaderLabels(["Email", "Username", "Role", "Name", "Address", "Phone", "Action"])
         self.user_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         main_layout.addWidget(self.user_table)
 
@@ -75,9 +75,9 @@ class AdminWindow(QWidget):
         main_layout.addWidget(rides_title)
 
         self.rides_table = QTableWidget()
-        self.rides_table.setColumnCount(6)
+        self.rides_table.setColumnCount(7)
         self.rides_table.setHorizontalHeaderLabels(
-            ["ID", "Customer", "Driver", "Pickup", "Destination", "Status"]
+            ["ID", "Customer", "Driver", "Pickup", "Destination", "Status", "Assign Driver"]
         )
         self.rides_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         main_layout.addWidget(self.rides_table)
@@ -95,11 +95,14 @@ class AdminWindow(QWidget):
             self.user_table.setItem(row, 0, QTableWidgetItem(user["email"]))
             self.user_table.setItem(row, 1, QTableWidgetItem(user["username"]))
             self.user_table.setItem(row, 2, QTableWidgetItem(user["role"]))
+            self.user_table.setItem(row, 3, QTableWidgetItem(user.get("name") or "-"))
+            self.user_table.setItem(row, 4, QTableWidgetItem(user.get("address") or "-"))
+            self.user_table.setItem(row, 5, QTableWidgetItem(user.get("phone_number") or "-"))
 
             btn = QPushButton("Delete")
             btn.setIcon(QIcon("assets/icons/delete.svg"))
             btn.clicked.connect(lambda _, email=user["email"]: self.delete_user(email))
-            self.user_table.setCellWidget(row, 3, btn)
+            self.user_table.setCellWidget(row, 6, btn)
 
     def delete_user(self, email):
         confirm = QMessageBox.question(
@@ -127,6 +130,40 @@ class AdminWindow(QWidget):
             self.rides_table.setItem(row, 3, QTableWidgetItem(str(ride["pickup_location"])))
             self.rides_table.setItem(row, 4, QTableWidgetItem(str(ride["destination"])))
             self.rides_table.setItem(row, 5, QTableWidgetItem(ride["status"]))
+            
+            # Add Assign Driver button for pending rides
+            if ride["status"] == "pending":
+                assign_btn = QPushButton("Assign Driver")
+                assign_btn.setIcon(QIcon("assets/icons/accept.svg"))
+                assign_btn.clicked.connect(lambda _, ride_id=ride["id"]: self.assign_driver(ride_id))
+                self.rides_table.setCellWidget(row, 6, assign_btn)
+            else:
+                self.rides_table.setItem(row, 6, QTableWidgetItem("-"))
+
+    # -------------------------------------------------------
+    # ASSIGN DRIVER
+    # -------------------------------------------------------
+    def assign_driver(self, ride_id):
+        """Admin assigns a driver to a ride"""
+        drivers = Admin.get_drivers()
+        if not drivers:
+            QMessageBox.warning(self, "Error", "No drivers available.")
+            return
+        
+        # Create driver selection dialog
+        driver_emails = [d["email"] for d in drivers]
+        driver_email, ok = QInputDialog.getItem(
+            self, "Assign Driver", "Select a driver:", driver_emails, 0, False
+        )
+        
+        if ok and driver_email:
+            from models.ride import Ride
+            success, message = Ride.assign_driver(ride_id, driver_email)
+            if success:
+                QMessageBox.information(self, "Success", message)
+                self.load_rides()
+            else:
+                QMessageBox.warning(self, "Error", message)
 
     # -------------------------------------------------------
     # LOAD ANALYTICS
