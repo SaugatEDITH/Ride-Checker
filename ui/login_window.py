@@ -108,7 +108,7 @@ class LoginWindow(QWidget):
         # -----------------------
         # Footer
         # -----------------------
-        footer = QLabel("© Ride Hailing App 2025")
+        footer = QLabel("© Ride-CHECKER App 2025")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("font-size: 12px; color: #aaaaaa;")
         main_layout.addWidget(footer)

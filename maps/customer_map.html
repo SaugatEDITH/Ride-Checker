@@ -17,7 +17,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_90a6f02084962552248560d1deff777f {
+                #map_dc5bb884c864d4098126817a86b0b083 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -54,14 +54,14 @@
 <body>
     
     
-            <div class="folium-map" id="map_90a6f02084962552248560d1deff777f" ></div>
+            <div class="folium-map" id="map_dc5bb884c864d4098126817a86b0b083" ></div>
         
 </body>
 <script>
     
     
-            var map_90a6f02084962552248560d1deff777f = L.map(
-                "map_90a6f02084962552248560d1deff777f",
+            var map_dc5bb884c864d4098126817a86b0b083 = L.map(
+                "map_dc5bb884c864d4098126817a86b0b083",
                 {
                     center: [27.7172, 85.324],
                     crs: L.CRS.EPSG3857,
@@ -78,7 +78,7 @@
 
         
     
-            var tile_layer_b7975b5e0f8b86a02eea10617a42903c = L.tileLayer(
+            var tile_layer_015f343035c374ef4996d82c7268002d = L.tileLayer(
                 "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {
   "minZoom": 0,
@@ -95,11 +95,11 @@
             );
         
     
-            tile_layer_b7975b5e0f8b86a02eea10617a42903c.addTo(map_90a6f02084962552248560d1deff777f);
+            tile_layer_015f343035c374ef4996d82c7268002d.addTo(map_dc5bb884c864d4098126817a86b0b083);
         
 
         // Custom click handler to send coordinates to console
-        map_90a6f02084962552248560d1deff777f.on('click', function(e) {
+        map_dc5bb884c864d4098126817a86b0b083.on('click', function(e) {
             var lat = e.latlng.lat;
             var lng = e.latlng.lng;
             console.log('MAP_CLICK: Latitude: ' + lat + ', Longitude: ' + lng);
@@ -108,7 +108,7 @@
             L.popup()
                 .setLatLng(e.latlng)
                 .setContent("Latitude: " + lat.toFixed(5) + "<br>Longitude: " + lng.toFixed(5))
-                .openOn(map_90a6f02084962552248560d1deff777f);
+                .openOn(map_dc5bb884c864d4098126817a86b0b083);
         });
         
 </script>
