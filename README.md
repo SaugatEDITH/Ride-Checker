@@ -58,7 +58,7 @@ Ride-Checker/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Ride-Checker.git
+   git clone https://github.com/SaugatEDITH/Ride-Checker.git
    cd Ride-Checker
    ```
 
