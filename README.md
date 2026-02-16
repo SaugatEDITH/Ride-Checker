@@ -58,7 +58,7 @@ Ride-Checker/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Ride-Checker.git
+   git clone https://github.com/SaugatEDITH/Ride-Checker.git
    cd Ride-Checker
    ```
 
@@ -229,4 +229,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Note**: This project is designed for educational purposes and demonstration of full-stack Python application development. For production use, additional security measures and scalability considerations should be implemented.
-
