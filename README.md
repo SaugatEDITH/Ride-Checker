@@ -123,6 +123,15 @@ pytest -m "not slow"    # Exclude slow tests
 - API endpoint testing
 - Edge case and error handling
 
+### Test Credentials
+For testing the application, use these pre-configured accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Customer | testuser@test.com | test |
+| Driver | testdriver@driver.com | driver |
+| Admin | admin@admin.com | admin |
+
 ## 🎯 User Roles
 
 ### Customer
@@ -220,3 +229,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Note**: This project is designed for educational purposes and demonstration of full-stack Python application development. For production use, additional security measures and scalability considerations should be implemented.
+
